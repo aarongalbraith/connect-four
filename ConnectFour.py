@@ -48,11 +48,15 @@ def printBoard():
 	print('\n')
 
 # prompts next player for column choice and repeats until valid input is given; the value returned is adjusted to zero-index
+# this currently has a carve-out for 0 to trigger the computer player
+# change it back by switching <=0 to just <0 and removing the if (column == 0) block
 def columnSelection():
 	column = -1
-	while (column < 0 or column > numCols or not isColumnFree(column-1)):
+	while (column <= 0 or column > numCols or not isColumnFree(column-1)):
 		print(playerName[turn%2] + ' (' + playerToken[turn%2] + '), select a column')
 		column = int(input())
+		if (column == 0):
+			return concrete()
 	return (column-1)
 
 # checks whether the top entry of a column is free
@@ -66,7 +70,7 @@ def isColumnFree(column):
 def updateBoard(player, column):
 	for i in range(numRows):
 		if (board[column][i] == blank):
-			board[column][i] = playerToken[turn%2]
+			board[column][i] = playerToken[player]
 			highest[column] += 1
 			playLog.append([column, highest[column]])
 			break
@@ -74,8 +78,9 @@ def updateBoard(player, column):
 # checks whether the current player has just won after the most recent move has been logged
 def checkWin():
 	# identify (x,y) coordinates of the most recently placed token
-	x = playLog[turn][0]
-	y = playLog[turn][1]
+	t = len(playLog) - 1
+	x = playLog[t][0]
+	y = playLog[t][1]
 	if (checkWinVert(x,y) or checkWinHor(x,y) or checkWinDiagSWNE(x,y) or checkWinDiagNWSE(x,y)):
 		return True
 	else:
@@ -190,17 +195,17 @@ def undoMoves(n):
 def concrete():
 	turnsRemaining = numCols * numRows - turn
 	moves = OpenMoves()
-	if (turnsRemaining == 0):
-		print('Uh oh, there shouldnt be any turns remaining')
 	if (turnsRemaining > 0):
 		theMove = moves[0]
-		if (len(moves) == 1):
-			print('There is only one column to choose')
-			return theMove
-		player = turn%2
-		if (isWinningPossible(player)):
-			print('We are going for the win')
-			return movesToWin(player)[0]
+	else:
+		print('Uh oh, there shouldnt be any turns remaining')
+	if (len(moves) == 1):
+		print('There is only one column to choose')
+		return theMove
+	player = turn%2
+	if (isWinningPossible(player)):
+		print('We are going for the win')
+		return movesToWin(player)[0]
 	if (turnsRemaining > 1):
 		if (isLosingInevitable(player)):
 			print('There are no ways to avoid loss')
@@ -231,7 +236,9 @@ def concrete():
 	return theMove
 
 # CONCERNING T = 0 (could the game end on this (our) turn, i.e. can we win in one move)
+
 def isWinningPossible(player):
+	print('... determining if ' + playerName[player] + ' can win ...')
 	for i in OpenMoves():
 		updateBoard(player, i)
 		if (checkWin()):
@@ -241,6 +248,7 @@ def isWinningPossible(player):
 			undoMoves(1)
 
 def movesToWin(player):
+	print('... determining what moves give ' + playerName[player] + ' a win ...')	
 	moves = []
 	for i in OpenMoves():
 		updateBoard(player, i)
@@ -254,6 +262,7 @@ def movesToWin(player):
 # CONCERNING T = 1 (could the game end on their next turn)
 
 def isLosingPossible(player):
+	print('... determining if ' + playerName[player] + ' can lose ...')	
 	for i in OpenMoves():
 		updateBoard(player, i)
 		if (isWinningPossible(1-player)):
@@ -264,6 +273,7 @@ def isLosingPossible(player):
 	return False
 
 def isLosingInevitable(player):
+	print('... determining if ' + playerName[player] + ' can avoid losing ...')	
 	for i in OpenMoves():
 		updateBoard(player, i)
 		if (not isWinningPossible(1-player)):
@@ -274,6 +284,7 @@ def isLosingInevitable(player):
 	return True
 
 def movesToLose(player):
+	print('... determining what moves give ' + playerName[player] + ' a loss ...')	
 	moves = []
 	for i in OpenMoves():
 		updateBoard(player, i)
@@ -341,6 +352,7 @@ def movesToGetTrapped(player):
 	return moves
 
 # CONCERNING T = 4 (can we win two moves from now)
+
 def isTrapping2xPossible(player):
 	for i in OpenMoves():
 		updateBoard(player, i)
@@ -363,6 +375,7 @@ def movesToTrap2x(player):
 	return moves
 
 # CONCERNING T = 5 (can they trap us and win three moves from now)
+
 def isGettingTrapped2xPossible(player):
 	for i in OpenMoves():
 		updateBoard(player, i)
@@ -395,6 +408,7 @@ def movesToGetTrapped2x(player):
 	return moves
 	
 # CONCERNING T = 6 (can we win three moves from now)
+
 def isTrapping3xPossible(player):
 	for i in OpenMoves():
 		updateBoard(player, i)
@@ -415,10 +429,6 @@ def movesToTrap3x(player):
 		else:
 			undoMoves(1)
 	return moves
-
-
-
-
 
 # GAME PLAY
 printBoard()
