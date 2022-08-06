@@ -1,4 +1,6 @@
+# ----------
 # GAME SETUP
+# ----------
 
 print('How many columns?')
 numCols = int(input())
@@ -10,7 +12,9 @@ playerName.append(input())
 print('Enter PLAYER TWO name')
 playerName.append(input())
 
+# ---------
 # VARIABLES
+# ---------
 
 # specifies the blank character for the board
 blank = ' . '
@@ -31,9 +35,11 @@ playLog = []
 isGameOver = False
 
 # sets tokens for each player
-playerToken = ['[O]', '[X]']
+playerToken = [' O ', ' X ']
 
+# ---------------------
 # FUNCTIONS — GAME PLAY
+# ---------------------
 
 # prints the current state of the board
 def printBoard():
@@ -56,7 +62,7 @@ def columnSelection():
 		print(playerName[turn%2] + ' (' + playerToken[turn%2] + '), select a column')
 		column = int(input())
 		if (column == 0):
-			return concrete()
+			return HAL()
 	return (column-1)
 
 # checks whether the top entry of a column is free
@@ -169,7 +175,9 @@ def checkWinDiagNWSE(x,y):
 				return True
 	return False
 
-# FUNCTIONS — HYPOTHETICALS AND STRATEGY
+# ----------------------
+# FUNCTIONS — CORE LOGIC
+# ----------------------
 
 # specify which columns are open to take a token
 def OpenMoves():
@@ -190,11 +198,15 @@ def undoMoves(n):
 		playLog.pop()
 	return
 
-# STRATEGY FUNCTIONS
+# -----------------
+# STRATEGY PROFILES
+# -----------------
 
-def concrete():
+# HAL chooses columns that guarantee wins or traps, rejects columns that allow opponent to win or trap, and otherwise defaults to center-most
+def HAL():
 	turnsRemaining = numCols * numRows - turn
 	moves = OpenMoves()
+	moves = middleOut(moves)
 	if (turnsRemaining > 0):
 		theMove = moves[0]
 	else:
@@ -203,43 +215,48 @@ def concrete():
 		print('There is only one column to choose')
 		return theMove
 	player = turn%2
-	if (isWinningPossible(player)):
+	if (isWinningPossible(player, moves)):
 		print('We are going for the win')
-		return movesToWin(player)[0]
+		return movesToWin(player, moves)[0]
 	if (turnsRemaining > 1):
-		if (isLosingInevitable(player)):
+		if (isLosingInevitable(player, moves)):
 			print('There are no ways to avoid loss')
 			return theMove
-		if (isLosingPossible(player)):
+		if (isLosingPossible(player, moves)):
 			print('Losing is possible but we can avoid losing')
-			for i in movesToLose(player):
+			for i in movesToLose(player, moves):
+				print('We can remove column ' + str(i + 1) + ' to avoid losing')
 				moves.remove(i)
 			theMove = moves[0]
 	if (turnsRemaining > 2):
-		if (isTrappingPossible(player)):
+		if (isTrappingPossible(player, moves)):
 			print('It looks like a trap is possible')
-			for i in movesToTrap(player):
+			for i in movesToTrap(player, moves):
 				for j in moves:
 					if (i == j):
 						print('We are going for the trap')
 						return i
 			print('It looks like all the traps were false hopes')
 	if (turnsRemaining > 3):
-		if (isGettingTrappedInevitable(player)):
+		if (isGettingTrappedInevitable(player, moves)):
 			print('There are no ways to avoid a trap')
 			return theMove
-		if (isGettingTrappedPossible(player)):
+		if (isGettingTrappedPossible(player, moves)):
 			print('Getting trapped is possible but avoidable')
-			for i in movesToGetTrapped(player):
+			for i in movesToGetTrapped(player, moves):
+				print('We can remove column ' + str(i + 1) + ' to avoid getting trapped')
 				moves.remove(i)
 			theMove = moves[0]
 	return theMove
 
+# ---------------------------------
+# FUNCTIONS — ABSOLUTIST STRATEGIES
+# ---------------------------------
+
 # CONCERNING T = 0 (could the game end on this (our) turn, i.e. can we win in one move)
 
-def isWinningPossible(player):
-	print('... determining if ' + playerName[player] + ' can win ...')
-	for i in OpenMoves():
+def isWinningPossible(player, moves):
+	for i in moves:
 		updateBoard(player, i)
 		if (checkWin()):
 			undoMoves(1)
@@ -247,194 +264,220 @@ def isWinningPossible(player):
 		else:
 			undoMoves(1)
 
-def movesToWin(player):
-	print('... determining what moves give ' + playerName[player] + ' a win ...')	
-	moves = []
-	for i in OpenMoves():
+def movesToWin(player, moves):
+	movesToWin = []
+	for i in moves:
 		updateBoard(player, i)
 		if (checkWin()):
 			undoMoves(1)
-			moves.append(i)
+			movesToWin.append(i)
 		else:
 			undoMoves(1)
-	return moves
+	return movesToWin
 
 # CONCERNING T = 1 (could the game end on their next turn)
 
-def isLosingPossible(player):
-	print('... determining if ' + playerName[player] + ' can lose ...')	
-	for i in OpenMoves():
+def isLosingPossible(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if (isWinningPossible(1-player)):
+		if (isWinningPossible(1-player, OpenMoves())):
 			undoMoves(1)
 			return True
 		else:
 			undoMoves(1)
 	return False
 
-def isLosingInevitable(player):
-	print('... determining if ' + playerName[player] + ' can avoid losing ...')	
-	for i in OpenMoves():
+def isLosingInevitable(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if (not isWinningPossible(1-player)):
+		if (not isWinningPossible(1-player, OpenMoves())):
 			undoMoves(1)
 			return False
 		else:
 			undoMoves(1)
 	return True
 
-def movesToLose(player):
-	print('... determining what moves give ' + playerName[player] + ' a loss ...')	
-	moves = []
-	for i in OpenMoves():
+def movesToLose(player, moves):
+	movesToLose = []
+	for i in moves:
 		updateBoard(player, i)
-		if (isWinningPossible(1-player)):
-			moves.append(i)
+		if (isWinningPossible(1-player, OpenMoves())):
+			movesToLose.append(i)
 			undoMoves(1)
 		else:
 			undoMoves(1)
-	return moves
+	return movesToLose
 
 # CONCERNING T = 2 (can we trap them and win on our next move)
 
-def isTrappingPossible(player):
-	for i in OpenMoves():
+def isTrappingPossible(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if (isLosingInevitable(1-player)):
+		if (isLosingInevitable(1-player, OpenMoves())):
 			undoMoves(1)
 			return True
 		else:
 			undoMoves(1)
 	return False
 
-def movesToTrap(player):
-	moves = []
-	for i in OpenMoves():
+def movesToTrap(player, moves):
+	movesToTrap = []
+	for i in moves:
 		updateBoard(player, i)
-		if (isLosingInevitable(1-player)):
-			moves.append(i)
+		if (isLosingInevitable(1-player, OpenMoves())):
+			movesToTrap.append(i)
 			undoMoves(1)
 		else:
 			undoMoves(1)
-	return moves
+	return movesToTrap
 
 # CONCERNING T = 3 (can they trap us)
 
-def isGettingTrappedPossible(player):
-	for i in OpenMoves():
+def isGettingTrappedPossible(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if isTrappingPossible(1-player):
+		if isTrappingPossible(1-player, OpenMoves()):
 			undoMoves(1)
 			return True
 		else:
 			undoMoves(1)
 	return False
 
-def isGettingTrappedInevitable(player):
-	for i in OpenMoves():
+def isGettingTrappedInevitable(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if (not isTrappingPossible(1-player)):
+		if (not isTrappingPossible(1-player, OpenMoves())):
 			undoMoves(1)
 			return False
 		else:
 			undoMoves(1)
 	return True
 
-def movesToGetTrapped(player):
-	moves = []
-	for i in OpenMoves():
+def movesToGetTrapped(player, moves):
+	movesToGetTrapped = []
+	for i in moves:
 		updateBoard(player, i)
-		if (isTrappingPossible(1-player)):
-			moves.append(i)
+		if (isTrappingPossible(1-player, OpenMoves())):
+			movesToGetTrapped.append(i)
 			undoMoves(1)
 		else:
 			undoMoves(1)
-	return moves
+	return movesToGetTrapped
 
 # CONCERNING T = 4 (can we win two moves from now)
 
-def isTrapping2xPossible(player):
-	for i in OpenMoves():
+def isTrapping2xPossible(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if (isGettingTrappedInevitable(1-player)):
+		if (isGettingTrappedInevitable(1-player, OpenMoves())):
 			undoMoves(1)
 			return True
 		else:
 			undoMoves(1)
 	return False
 
-def movesToTrap2x(player):
-	moves = []
-	for i in OpenMoves():
+def movesToTrap2x(player, moves):
+	movesToTrap2x = []
+	for i in moves:
 		updateBoard(player, i)
-		if (isGettingTrappedInevitable(1-player)):
-			moves.append(i)
+		if (isGettingTrappedInevitable(1-player, OpenMoves())):
+			movesToTrap2x.append(i)
 			undoMoves(1)
 		else:
 			undoMoves(1)
-	return moves
+	return movesToTrap2x
 
 # CONCERNING T = 5 (can they trap us and win three moves from now)
 
-def isGettingTrapped2xPossible(player):
-	for i in OpenMoves():
+def isGettingTrapped2xPossible(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if isTrapping2xPossible(1-player):
+		if isTrapping2xPossible(1-player, OpenMoves()):
 			undoMoves(1)
 			return True
 		else:
 			undoMoves(1)
 	return False
 
-def isGettingTrapped2xInevitable(player):
-	for i in OpenMoves():
+def isGettingTrapped2xInevitable(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if (not isTrapping2xPossible(1-player)):
+		if (not isTrapping2xPossible(1-player, OpenMoves())):
 			undoMoves(1)
 			return False
 		else:
 			undoMoves(1)
 	return True
 
-def movesToGetTrapped2x(player):
-	moves = []
-	for i in OpenMoves():
+def movesToGetTrapped2x(player, moves):
+	movesToGetTrapped2x = []
+	for i in moves:
 		updateBoard(player, i)
-		if (isTrapping2xPossible(1-player)):
-			moves.append(i)
+		if (isTrapping2xPossible(1-player, OpenMoves())):
+			movesToGetTrapped2x.append(i)
 			undoMoves(1)
 		else:
 			undoMoves(1)
-	return moves
+	return movesToGetTrapped2x
 	
 # CONCERNING T = 6 (can we win three moves from now)
 
-def isTrapping3xPossible(player):
-	for i in OpenMoves():
+def isTrapping3xPossible(player, moves):
+	for i in moves:
 		updateBoard(player, i)
-		if (isGettingTrapped2xInevitable(1-player)):
+		if (isGettingTrapped2xInevitable(1-player, OpenMoves())):
 			undoMoves(1)
 			return True
 		else:
 			undoMoves(1)
 	return False
 
-def movesToTrap3x(player):
-	moves = []
-	for i in OpenMoves():
+def movesToTrap3x(player, moves):
+	movesToTrap3x = []
+	for i in moves:
 		updateBoard(player, i)
-		if (isGettingTrapped2xInevitable(1-player)):
-			moves.append(i)
+		if (isGettingTrapped2xInevitable(1-player, OpenMoves())):
+			movesToTrap3x.append(i)
 			undoMoves(1)
 		else:
 			undoMoves(1)
-	return moves
+	return movesToTrap3x
 
+# ------------------------------------
+# FUNCTIONS — PROBABILISTIC STRATEGIES
+# ------------------------------------
+
+# takes all available moves and reorders them from middle out, (skipping any that are not available)
+def middleOut(moves):
+	shuffle = []
+	if (numCols%2 == 1):
+		mid = int((numCols-1)/2)
+		for i in moves:
+			if (i == mid):
+				shuffle.append(mid)
+	else:
+		mid = int(numCols/2)
+	for i in range(mid):
+		p1 = mid-i-1
+		if (numCols%2 == 1):
+			p2 = mid+i+1
+		else:
+			p2 = mid+i
+		for j in moves:
+			if (j == p1):
+				shuffle.append(p1)
+			if (j == p2):
+				shuffle.append(p2)
+	return shuffle
+
+# ---------
 # GAME PLAY
+# ---------
+
 printBoard()
 while (not isGameOver):
 	if (playerName[turn%2] == 'HAL'):
-		updateBoard(turn%2, concrete())
+		updateBoard(turn%2, HAL())
 	else:
 		updateBoard(turn%2, columnSelection())
 
